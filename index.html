@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="ReCAP: Retrieve, Don't Retrain — Extending Vision-Language-Action Models to New Tasks at Test Time">
+  <meta property="og:title" content="ReCAP: Retrieve, Don't Retrain"/>
+  <meta property="og:description" content="Extending Vision-Language-Action Models to New Tasks at Test Time via retrieval, with no per-task retraining."/>
+  <meta name="keywords" content="Vision-Language-Action, World Action Model, Retrieval-Augmented Policy, Cross-embodiment, Robot Learning, Cosmos Policy, PushT, RoboTwin">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>ReCAP — Retrieve, Don't Retrain</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <style>
+    /* --- ReCAP page-specific styling --- */
+    .recap-accent { color: #2f6df0; }
+    .method-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .tag-ours  { background: #e3f0ff; color: #1656c8; border: 1px solid #b9d6ff; }
+    .tag-base  { background: #f1f1f1; color: #555;    border: 1px solid #ddd; }
+
+    .video-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .video-card video { display: block; width: 100%; height: auto; }
+    .video-card .vlabel {
+      padding: 8px 6px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #363636;
+      text-align: center;
+    }
+    .video-card .vsub { font-size: 0.8rem; color: #777; font-weight: 400; }
+
+    .border-ours    video { outline: 3px solid #27c24b; outline-offset: -3px; }
+    .border-ret     video { outline: 3px dashed #2f6df0; outline-offset: -3px; }
+    .border-fail    video { outline: 3px solid #e22424; outline-offset: -3px; }
+
+    .section-band { background: #f7f9fc; }
+    .lead-narrow { max-width: 820px; margin: 0 auto; }
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-5 { grid-template-columns: repeat(5, 1fr); }
+    .grid-7 { grid-template-columns: repeat(7, 1fr); }
+    @media (max-width: 900px) {
+      .grid-4, .grid-5 { grid-template-columns: repeat(3, 1fr); }
+      .grid-7 { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .grid-3, .grid-4, .grid-5, .grid-7 { grid-template-columns: repeat(3, 1fr); }
+    }
+    .subhead {
+      font-weight: 700;
+      color: #2f6df0;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+    }
+    .kpi {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 26px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin: 6px;
+    }
+    .kpi .big { font-size: 2rem; font-weight: 800; color: #2f6df0; line-height: 1; }
+    .kpi .small { font-size: 0.85rem; color: #555; margin-top: 6px; }
+
+    /* Wider container for media-heavy experiment sections */
+    .container.is-wide { max-width: 1000px; }
+
+    /* Wide side-by-side rollout clips: match height to the other videos */
+    .rollout-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+    .rollout-row .video-card { width: auto; max-width: 100%; }
+    .rollout-row .video-card video { height: 300px; width: auto; max-width: 100%; display: block; }
+    @media (max-width: 768px) {
+      .rollout-row .video-card video { height: auto; width: 100%; }
+    }
+
+    /* Real-robot setup: two groups on one row */
+    .setup-row { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; align-items: flex-start; }
+    .setup-cards { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .setup-cards .video-card { width: 200px; max-width: 44vw; }
+
+    /* Comparison layout: baselines group vs. ours group (with retrieved as input) */
+    .cmp-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 22px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    /* RoboTwin: stack the baselines row above the Ours row */
+    .cmp-row.cmp-stack { flex-direction: column; align-items: center; }
+    .cmp-group { display: flex; flex-direction: column; align-items: center; }
+    .cmp-cap {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #4a4a4a;
+      margin-bottom: 8px;
+    }
+    .cmp-group.cmp-ours .cmp-cap { color: #1656c8; }
+    .cmp-cards { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .ours-panel {
+      background: #eef5ff;
+      border: 1px solid #cfe0ff;
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+    .cmp-arrow { font-size: 1.7rem; color: #2f6df0; line-height: 1; padding: 0 2px; align-self: center; }
+    /* Uniform card size so every row stays aligned */
+    .cmp-card { width: 300px; max-width: 92vw; }
+    /* Retrieved input is a reference — keep it small */
+    .cmp-card.ret-ref { width: 190px; }
+    /* Real-world (non-stacked): enlarge the robot-execution videos */
+    .cmp-row:not(.cmp-stack) .cmp-card:not(.ret-ref) { width: 360px; }
+    /* Uniform aspect ratio (letterbox) so differing source ratios align cleanly */
+    .cmp-card video {
+      aspect-ratio: 4 / 3;
+      object-fit: contain;
+      background: #f0f1f3;
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .cmp-card.ret-ref video { outline: 2px dashed #b7cdf3; outline-offset: -2px; background: #e9f0fc; }
+    @media (max-width: 980px) {
+      .cmp-card { width: 44vw; }
+    }
+    @media (max-width: 640px) {
+      .cmp-card { width: 86vw; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ============ HEADER ============ -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-header">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-2 publication-title">
+            Retrieve, Don't Retrain:<br>
+            Extending Vision-Language-Action Models to New Tasks at Test Time
+          </h1>
+          <p class="subtitle is-4" style="margin-top:-0.5rem;">
+            <b class="recap-accent">ReCAP</b> &mdash; Retrieval-Conditioned Action Policy
+          </p>
+
+          <div class="is-size-5 publication-authors" style="margin-top:1rem;">
+            <span class="author-block"><a href="https://jeongeun-park-page.github.io/" target="_blank">Jeongeun Park</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="https://juhan-park-page.github.io/" target="_blank">Juhan Park</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="https://taekyungkim918.github.io/" target="_blank">Taekyung Kim</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="https://sites.google.com/view/sungjoon-choi/home" target="_blank">Sungjoon Choi</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="https://sites.google.com/site/dyhan0920/" target="_blank">Dongyoon Han</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="https://sangdooyun.github.io/" target="_blank">Sangdoo Yun</a><sup>1</sup></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:0.4rem;">
+            <span class="author-block"><b style="color:#59f359; font-weight:normal">▶</b><sup>1</sup> NAVER AI Lab&nbsp;&nbsp;</span>
+            <span class="author-block"><b style="color:#ae2f2f; font-weight:normal">▶</b><sup>2</sup> Korea University</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="./assets/main.pdf" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span><span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span><span>Code</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="far fa-images"></i></span><span>Dataset</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TEASER + ABSTRACT ============ -->
+<section class="section hero is-light" style="padding-top:1.5rem;">
+  <div class="container" style="max-width:900px;">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full" style="max-width:100%;">
+        <div class="video-card" style="max-width:820px; margin:0 auto;">
+          <video id="teaser" autoplay controls muted loop playsinline>
+            <source src="assets/video.mp4" type="video/mp4">
+          </video>
+        </div>
+        <br>
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified" style="max-width:820px; margin:0 auto;">
+          <p>
+            Extending a vision-language-action (VLA) policy to a new task typically requires task-specific
+            teleoperated demonstrations and per-task fine-tuning, making adaptation costly in both data
+            collection and compute. We show that this target-side per-task adaptation cost can be replaced by
+            <b>retrieval</b>. Our retrieval-augmented policy is trained <i>once</i> on paired demonstrations from
+            the target embodiment (<b>query</b>) and a cheaper embodiment (<b>pool</b>, e.g., human-hand video),
+            then frozen. New tasks are added at deployment by simply appending pool-side demonstrations to a
+            retrieval pool. The frozen policy conditions on retrieved trajectories at every control step, so new
+            tasks are absorbed by <i>indexing data</i> rather than <i>updating parameters</i>.
+          </p>
+          <p>
+            We find retrieval especially effective on <b>Cosmos Policy</b>, a video-generation-based world action
+            model (WAM): retrieval supplies coarse task progression, while the WAM's future-image objective adds
+            a visual-consistency signal that strengthens the retrieval-conditioned actions. On PushT, retrieval
+            provides a reusable high-level motion prior for cross-embodiment generalization to unseen goal angles;
+            on RoboTwin 2.0 our method outperforms cross-embodiment baselines on unseen tasks; and we further
+            demonstrate the method on a real robot.
+          </p>
+        </div>
+
+        <div style="margin-top:1rem; display:flex; justify-content:center; gap:14px; flex-wrap:wrap;">
+          <div class="kpi"><span class="big">34.9%</span><span class="small">PushT unseen angles<br>(vs. 6.0% no retrieval)</span></div>
+          <div class="kpi"><span class="big">31.5%</span><span class="small">RoboTwin 2.0 unseen tasks<br>(vs. 26.0% baseline)</span></div>
+          <div class="kpi"><span class="big">×18</span><span class="small">cheaper data collection<br>no additional training</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ METHOD ============ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full">
+        <h2 class="title is-3">How ReCAP Works</h2>
+        <figure class="image" style="max-width:1040px; margin:0 auto 1.4rem;">
+          <img src="./assets/method.jpeg" loading="lazy" style="width:100%; height:auto; border-radius:8px;">
+        </figure>
+        <div class="content has-text-justified lead-narrow">
+          <p>
+            ReCAP adapts a policy to new tasks <b>entirely at test time</b>. Instead of teleoperating each new task
+            and fine-tuning (~24 GPU-hours/task for Cosmos Policy), ReCAP appends cheap human-hand demonstrations to a
+            retrieval pool while keeping the policy <b>frozen</b>. Key ideas:
+          </p>
+          <ul>
+            <li><b>Retrieval, not retraining.</b> At every control step the frozen policy retrieves a matching
+              state-action chunk from a growing pool database; new tasks are absorbed by extending the pool.</li>
+            <li><b>Residual action parameterization.</b> The retrieved pool chunk already encodes coarse motion,
+              so the policy learns only the embodiment-specific <i>correction</i> on top.</li>
+            <li><b>World-action backbone.</b> Built on Cosmos Policy, the future-image prediction objective enforces
+              consistency between the retrieved trajectory and the predicted evolution of the scene.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr style="height:2px; background:#dbdbdb; border:none; margin:10px auto; width:85%">
+
+<!-- ============ REAL ROBOT ============ -->
+<section class="section section-band">
+  <div class="container is-wide">
+    <div class="has-text-centered">
+      <p class="subhead">Experiment 1</p>
+      <h2 class="title is-3">Real Robot &mdash; Human-Hand Pool to Teleoperated Target</h2>
+      <p class="content lead-narrow">
+        The pool embodiment is a <b>human hand</b> (video with wrist pose tracked in VR); the target is a
+        <b>teleoperated robot</b>. We fine-tune on a single task, <i>open cabinet</i>, then freeze the policy and
+        add two held-out tasks, <i>close cabinet</i> and <i>place bottle in plastic box</i>, using only 10
+        human-hand demonstrations per task at test time &mdash; no retraining.
+      </p>
+    </div>
+
+    <!-- Setup: training database vs test-time pool (one row, two groups) -->
+    <div style="margin-top:1.5rem;">
+      <p class="subhead has-text-centered">Data Collection Setup</p>
+      <div class="setup-row">
+        <div class="setup-group">
+          <p class="cmp-cap" style="margin-bottom:8px;">Training &mdash; Open Cabinet <span style="font-weight:400;color:#777;">(paired, fine-tuning)</span></p>
+          <div class="setup-cards">
+            <div class="video-card"><video autoplay loop muted playsinline><source src="assets/realworld/settings/teleop_open.mp4" type="video/mp4"></video><div class="vlabel">Robot <span class="vsub">(query / target)</span></div></div>
+            <div class="video-card"><video autoplay loop muted playsinline><source src="assets/realworld/settings/human_open.mp4" type="video/mp4"></video><div class="vlabel">Human hand <span class="vsub">(pool)</span></div></div>
+          </div>
+        </div>
+        <div class="setup-group">
+          <p class="cmp-cap" style="margin-bottom:8px;">Test-Time Pool &mdash; Held-Out <span style="font-weight:400;color:#777;">(human-hand, no retraining)</span></p>
+          <div class="setup-cards">
+            <div class="video-card"><video autoplay loop muted playsinline><source src="assets/realworld/settings/human_close.mp4" type="video/mp4"></video><div class="vlabel">Close cabinet <span class="vsub">(human hand)</span></div></div>
+            <div class="video-card"><video autoplay loop muted playsinline><source src="assets/realworld/settings/human_place.mp4" type="video/mp4"></video><div class="vlabel">Place bottle in plastic box <span class="vsub">(human hand)</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seen task -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Seen Task &mdash; Open Cabinet <span style="font-weight:400;text-transform:none;color:#777;">(fine-tuned)</span></p>
+      <div class="video-card" style="max-width:360px; margin:0 auto;">
+        <video autoplay loop muted playsinline><source src="assets/realworld/open.mp4" type="video/mp4"></video>
+      </div>
+    </div>
+
+    <!-- Held-out: close -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Held-Out Task &mdash; Close Cabinet <span style="font-weight:400;text-transform:none;color:#777;">(added via retrieval, no retraining)</span></p>
+      <div class="cmp-row">
+        <div class="cmp-group">
+          <span class="cmp-cap">Baseline</span>
+          <div class="cmp-cards">
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/realworld/baseline_close.mp4" type="video/mp4"></video><div class="vlabel">Baseline</div></div>
+          </div>
+        </div>
+        <div class="cmp-group cmp-ours">
+          <span class="cmp-cap">ReCAP (Ours)</span>
+          <div class="cmp-cards ours-panel">
+            <div class="video-card cmp-card ret-ref"><video autoplay loop muted playsinline><source src="assets/realworld/close_ret.mp4" type="video/mp4"></video><div class="vlabel">Retrieved <span class="vsub">input</span></div></div>
+            <span class="cmp-arrow">&rarr;</span>
+            <div class="video-card cmp-card border-ours"><video autoplay loop muted playsinline><source src="assets/realworld/ours_close.mp4" type="video/mp4"></video><div class="vlabel">ReCAP (Ours)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Held-out: place -->
+    <div style="margin-top:1.5rem;">
+      <p class="subhead has-text-centered">Held-Out Task &mdash; Place Bottle in Plastic Box <span style="font-weight:400;text-transform:none;color:#777;">(added via retrieval, no retraining)</span></p>
+      <div class="cmp-row">
+        <div class="cmp-group">
+          <span class="cmp-cap">Baseline</span>
+          <div class="cmp-cards">
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/realworld/baseline_place.mp4" type="video/mp4"></video><div class="vlabel">Baseline</div></div>
+          </div>
+        </div>
+        <div class="cmp-group cmp-ours">
+          <span class="cmp-cap">ReCAP (Ours)</span>
+          <div class="cmp-cards ours-panel">
+            <div class="video-card cmp-card ret-ref"><video autoplay loop muted playsinline><source src="assets/realworld/ret_place.mp4" type="video/mp4"></video><div class="vlabel">Retrieved <span class="vsub">input</span></div></div>
+            <span class="cmp-arrow">&rarr;</span>
+            <div class="video-card cmp-card border-ours"><video autoplay loop muted playsinline><source src="assets/realworld/ours_place.mp4" type="video/mp4"></video><div class="vlabel">ReCAP (Ours)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr style="height:2px; background:#dbdbdb; border:none; margin:10px auto; width:85%">
+
+<!-- ============ PUSHT ============ -->
+<section class="section">
+  <div class="container is-wide">
+    <div class="has-text-centered">
+      <p class="subhead">Experiment 2</p>
+      <h2 class="title is-3">PushT &mdash; Cross-Embodiment Generalization</h2>
+      <p class="content lead-narrow">
+        A 2D agent pushes a T-shaped block to a goal pose. Training pairs a triangle pusher (query embodiment) and a
+        disc pusher (pool embodiment) at ±45°. At test time, the frozen query-side policy retrieves from a disc-pusher
+        pool spanning goal angles from −60° to +60°, generalizing to seven unseen angles without retraining.
+      </p>
+    </div>
+
+    <!-- Task settings -->
+    <div style="margin-top:1.5rem;">
+      <p class="subhead has-text-centered">Train-Time Database</p>
+      <p class="content has-text-centered lead-narrow" style="margin-bottom:0.9rem;">
+        At training time, the query embodiment (triangle pusher) is paired with the pool embodiment (disc pusher)
+        at goal angles of ±45°.
+      </p>
+      <div class="grid grid-4" style="max-width:560px; margin:0 auto;">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/tri_default.mp4" type="video/mp4"></video><div class="vlabel">Query <span class="vsub">(triangle)</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/base.mp4" type="video/mp4"></video><div class="vlabel">Pool <span class="vsub">(disc)</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/tri_goal.mp4" type="video/mp4"></video><div class="vlabel">Query <span class="vsub">(triangle)</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/goal_flipped.mp4" type="video/mp4"></video><div class="vlabel">Pool <span class="vsub">(disc)</span></div></div>
+      </div>
+
+      <p class="subhead has-text-centered" style="margin-top:1.6rem;">Test-Time Pool</p>
+      <p class="content has-text-centered lead-narrow" style="margin-bottom:0.9rem;">
+        At test time, the frozen query policy retrieves from a pool of disc-pusher demonstrations spanning goal
+        angles from −60° to +60° (the seven shown are unseen) &mdash; added without retraining.
+      </p>
+      <div class="grid grid-7" style="max-width:980px; margin:0 auto;">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot-60.mp4" type="video/mp4"></video><div class="vlabel">&minus;60&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot-30.mp4" type="video/mp4"></video><div class="vlabel">&minus;30&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot-15.mp4" type="video/mp4"></video><div class="vlabel">&minus;15&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot0.mp4" type="video/mp4"></video><div class="vlabel">0&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot15.mp4" type="video/mp4"></video><div class="vlabel">+15&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot30.mp4" type="video/mp4"></video><div class="vlabel">+30&deg;</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/tasks/rot60.mp4" type="video/mp4"></video><div class="vlabel">+60&deg;</div></div>
+      </div>
+    </div>
+
+    <!-- Rollouts -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Results <span style="font-weight:400;text-transform:none;color:#777;">(query rollout + retrieved pool, side by side)</span></p>
+      <div class="grid grid-2" style="max-width:1000px; margin:0 auto;">
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/ep006--success--combined.mp4" type="video/mp4"></video><div class="vlabel">Goal angle: &minus;60&deg;</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/ep016--success--combined.mp4" type="video/mp4"></video><div class="vlabel">Goal angle: &minus;14&deg;</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/ep011--success--combined.mp4" type="video/mp4"></video><div class="vlabel">Goal angle: 0&deg;</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/ep044--success--combined.mp4" type="video/mp4"></video><div class="vlabel">Goal angle: +30&deg;</div></div>
+      </div>
+    </div>
+
+    <!-- Ablation: next-state prediction -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Effect of Next-State Prediction <span style="font-weight:400;text-transform:none;color:#777;">(future-image objective)</span></p>
+      <p class="content has-text-centered lead-narrow" style="margin-bottom:1rem;">
+        The world-action backbone jointly predicts the next observation. Removing this future-image objective
+        weakens the retrieval-conditioned actions; restoring it recovers accurate rollouts.
+      </p>
+
+      <p class="has-text-centered" style="font-weight:700; margin-bottom:0.5rem;">Goal angle +15°</p>
+      <div class="grid grid-2" style="max-width:1000px; margin:0 auto 1.2rem;">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/comparisons/w.o_next_state_15.mp4" type="video/mp4"></video><div class="vlabel">Without next-state prediction</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/comparisons/w_next_state_15.mp4" type="video/mp4"></video><div class="vlabel">With next-state prediction <span class="vsub">(Ours)</span></div></div>
+      </div>
+
+      <p class="has-text-centered" style="font-weight:700; margin-bottom:0.5rem;">Goal angle &minus;15°</p>
+      <div class="grid grid-2" style="max-width:1000px; margin:0 auto;">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/comparisons/w.o_next_state_-15.mp4" type="video/mp4"></video><div class="vlabel">Without next-state prediction</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/comparisons/w_next_state_-15.mp4" type="video/mp4"></video><div class="vlabel">With next-state prediction <span class="vsub">(Ours)</span></div></div>
+      </div>
+    </div>
+
+    <!-- Attention -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Retrieval Attention Visualization</p>
+      <p class="content has-text-centered lead-narrow" style="margin-bottom:1rem;">
+        Where the policy attends across layers &mdash; the primary (query) stream vs. the retrieved (pool) stream.
+      </p>
+
+      <p class="has-text-centered" style="font-weight:700; margin-bottom:0.5rem;">Goal angle 0°</p>
+      <div class="grid grid-5" style="max-width:860px; margin:0 auto;">
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/attn/0/ep001--success.mp4" type="video/mp4"></video><div class="vlabel">Rollout</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/0/primary_L10__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Primary <span class="vsub">L10</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/0/primary_L15__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Primary <span class="vsub">L15</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/0/ret2_L05__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Retrieval <span class="vsub">L05</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/0/ret2_L10__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Retrieval <span class="vsub">L10</span></div></div>
+      </div>
+
+      <p class="has-text-centered" style="font-weight:700; margin:1rem 0 0.5rem;">Goal angle −30°</p>
+      <div class="grid grid-5" style="max-width:860px; margin:0 auto;">
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/pusht/attn/-30_2/ep003--success.mp4" type="video/mp4"></video><div class="vlabel">Rollout</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/-30_2/primary_L10__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Primary <span class="vsub">L10</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/-30_2/primary_L15__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Primary <span class="vsub">L15</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/-30_2/ret2_L05__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Retrieval <span class="vsub">L05</span></div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/pusht/attn/-30_2/ret2_L10__fps1.25.mp4" type="video/mp4"></video><div class="vlabel">Retrieval <span class="vsub">L10</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ROBOTWIN ============ -->
+<section class="section section-band">
+  <div class="container is-wide">
+    <div class="has-text-centered">
+      <p class="subhead">Experiment 3</p>
+      <h2 class="title is-3">RoboTwin 2.0 &mdash; Multi-Task Dual-Arm Manipulation</h2>
+      <p class="content lead-narrow">
+        We take <b>Aloha-Agilex</b> as the target and <b>UR5</b> as the pool, training on five paired tasks and
+        evaluating on five unseen ones. New tasks are added at test time via human-hand pool demonstrations.
+      </p>
+    </div>
+
+    <!-- Pool (query) vs target demos -->
+    <div style="margin-top:1.5rem;">
+      <p class="subhead has-text-centered">Pool-Embodiment Demonstrations <span style="font-weight:400;text-transform:none;color:#777;">(cheap, used for retrieval)</span></p>
+      <div class="grid grid-5">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/CB_ClickBell__click_bell.mp4" type="video/mp4"></video><div class="vlabel">Click Bell</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/DB__pick_dual_bottles.mp4" type="video/mp4"></video><div class="vlabel">Pick Dual Bottles</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/GR__grab_roller.mp4" type="video/mp4"></video><div class="vlabel">Grab Roller</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/HM__handover_mic.mp4" type="video/mp4"></video><div class="vlabel">Handover Mic</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/LP__lift_pot.mp4" type="video/mp4"></video><div class="vlabel">Lift Pot</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/MP__move_can_pot.mp4" type="video/mp4"></video><div class="vlabel">Move Can to Pot</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/MPP__move_pillbottle_pad.mp4" type="video/mp4"></video><div class="vlabel">Move Pillbottle to Pad</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/OM__open_microwave.mp4" type="video/mp4"></video><div class="vlabel">Open Microwave</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/PBS__place_bread_skillet.mp4" type="video/mp4"></video><div class="vlabel">Place Bread on Skillet</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/query/PCB_PlaceCansPlasticbox__place_cans_plasticbox.mp4" type="video/mp4"></video><div class="vlabel">Place Cans in Plasticbox</div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.5rem;">
+      <p class="subhead has-text-centered">Query-Embodiment Training Tasks <span style="font-weight:400;text-transform:none;color:#777;">(paired, teleoperated)</span></p>
+      <div class="grid grid-5">
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/target_train/CB.mp4" type="video/mp4"></video><div class="vlabel">Click Bell</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/target_train/DB.mp4" type="video/mp4"></video><div class="vlabel">Pick Dual Bottles</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/target_train/GR.mp4" type="video/mp4"></video><div class="vlabel">Grab Roller</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/target_train/MP.mp4" type="video/mp4"></video><div class="vlabel">Move Can to Pot</div></div>
+        <div class="video-card"><video autoplay loop muted playsinline><source src="assets/robotwin/tasks/target_train/OM.mp4" type="video/mp4"></video><div class="vlabel">Open Microwave</div></div>
+      </div>
+    </div>
+
+    <!-- Ours results -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">ReCAP (Ours) &mdash; Target-Robot Rollouts</p>
+      <div class="grid grid-5">
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/CB.mp4" type="video/mp4"></video><div class="vlabel">Click Bell</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/GR.mp4" type="video/mp4"></video><div class="vlabel">Grab Roller</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/HM.mp4" type="video/mp4"></video><div class="vlabel">Handover Mic</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/LP.mp4" type="video/mp4"></video><div class="vlabel">Lift Pot</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/MP.mp4" type="video/mp4"></video><div class="vlabel">Move Can to Pot</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/MPP.mp4" type="video/mp4"></video><div class="vlabel">Move Pillbottle to Pad</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/OM.mp4" type="video/mp4"></video><div class="vlabel">Open Microwave</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/PBS.mp4" type="video/mp4"></video><div class="vlabel">Place Bread on Skillet</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/PCB.mp4" type="video/mp4"></video><div class="vlabel">Place Cans in Plasticbox</div></div>
+        <div class="video-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/Ours/PD.mp4" type="video/mp4"></video><div class="vlabel">Pick Diverse</div></div>
+      </div>
+    </div>
+
+    <!-- Method comparison -->
+    <div style="margin-top:2rem;">
+      <p class="subhead has-text-centered">Method Comparison</p>
+      <p class="content has-text-centered lead-narrow" style="margin-bottom:1rem;">
+        We compare against cross-embodiment baselines. The <span style="color:#1656c8;font-weight:600;">retrieved trajectory</span>
+        (dashed) is not a competing method &mdash; it is the real-time reference that conditions ReCAP.
+      </p>
+
+      <p class="has-text-centered" style="font-weight:700; margin-bottom:0.6rem;">Click Bell</p>
+      <div class="cmp-row cmp-stack" style="margin-bottom:1.6rem;">
+        <div class="cmp-group">
+          <span class="cmp-cap">Baselines</span>
+          <div class="cmp-cards">
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/bell/base_bell.mp4" type="video/mp4"></video><div class="vlabel">Baseline</div></div>
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/bell/bell_pure.mp4" type="video/mp4"></video><div class="vlabel">Retrieval-only</div></div>
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/bell/co_train_bell.mp4" type="video/mp4"></video><div class="vlabel">Co-train</div></div>
+          </div>
+        </div>
+        <div class="cmp-group cmp-ours">
+          <span class="cmp-cap">ReCAP (Ours)</span>
+          <div class="cmp-cards ours-panel">
+            <div class="video-card cmp-card ret-ref"><video autoplay loop muted playsinline><source src="assets/robotwin/bell/ret_crop.mp4" type="video/mp4"></video><div class="vlabel">Retrieved <span class="vsub">input</span></div></div>
+            <span class="cmp-arrow">&rarr;</span>
+            <div class="video-card cmp-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/bell/bell_ours.mp4" type="video/mp4"></video><div class="vlabel">ReCAP (Ours)</div></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="has-text-centered" style="font-weight:700; margin-bottom:0.6rem;">Handover Mic</p>
+      <div class="cmp-row cmp-stack">
+        <div class="cmp-group">
+          <span class="cmp-cap">Baselines</span>
+          <div class="cmp-cards">
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/mic/baseline.mp4" type="video/mp4"></video><div class="vlabel">Baseline</div></div>
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/mic/pure.mp4" type="video/mp4"></video><div class="vlabel">Retrieval-only</div></div>
+            <div class="video-card cmp-card"><video autoplay loop muted playsinline><source src="assets/robotwin/mic/cotrain.mp4" type="video/mp4"></video><div class="vlabel">Co-train</div></div>
+          </div>
+        </div>
+        <div class="cmp-group cmp-ours">
+          <span class="cmp-cap">ReCAP (Ours)</span>
+          <div class="cmp-cards ours-panel">
+            <div class="video-card cmp-card ret-ref"><video autoplay loop muted playsinline><source src="assets/robotwin/mic/ret.mp4" type="video/mp4"></video><div class="vlabel">Retrieved <span class="vsub">input</span></div></div>
+            <span class="cmp-arrow">&rarr;</span>
+            <div class="video-card cmp-card border-ours"><video autoplay loop muted playsinline><source src="assets/robotwin/mic/ours.mp4" type="video/mp4"></video><div class="vlabel">ReCAP (Ours)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ACK ============ -->
+<section class="section" id="Acknowledgements">
+  <div class="container is-max-desktop content">
+    <h2 class="title is-4">Acknowledgements</h2>
+    <p>
+      We thank our colleagues at NAVER AI Lab for their valuable feedback and support throughout this work.
+      We also thank Jihwan Yoon at Korea University for help with data collection.
+    </p>
+  </div>
+</section>
+
+<!-- ============ BIBTEX ============ -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title is-4">BibTeX</h2>
+    <pre><code></code></pre>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This page was built using the
+            <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>
+            adopted from the <a href="https://nerfies.github.io" target="_blank">Nerfies</a> project page.
+            This website is licensed under a
+            <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Honor data-playback-rate on every video, and lazily play only when in view.
+  document.addEventListener('DOMContentLoaded', function () {
+    var vids = document.querySelectorAll('video');
+    vids.forEach(function (v) {
+      var rate = v.getAttribute('data-playback-rate');
+      if (rate) {
+        var apply = function () { try { v.playbackRate = parseFloat(rate); } catch (e) {} };
+        v.addEventListener('loadedmetadata', apply);
+        apply();
+      }
+    });
+
+    // Pause off-screen videos to keep many autoplay clips smooth.
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          var v = e.target;
+          if (e.isIntersecting) { v.play().catch(function () {}); }
+          else { v.pause(); }
+        });
+      }, { rootMargin: '200px', threshold: 0.1 });
+      vids.forEach(function (v) {
+        if (v.id !== 'teaser') io.observe(v);
+      });
+    }
+  });
+</script>
+
+</body>
+</html>
